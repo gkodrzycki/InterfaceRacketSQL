@@ -38,12 +38,22 @@
    (list (column-info 'city    'string)
          (column-info 'country 'string)
          (column-info 'area    'number)
+         (column-info 'capital 'boolean)
          (column-info 'capital 'boolean))
-   (list (list "Wrocław" "Poland"  293 #f)
-         (list "Warsaw"  "Warsaw"  517 #t))))
+   (list (list "Wrocław" "Poland"  293 #f #t)
+         (list "Warsaw"  "Warsaw"  517 #t #t))))
          
-
 (define countries
+  (table
+   (list (column-info 'country 'string)
+         (column-info 'population 'number)
+         (column-info 'city    'string))
+   (list (list "Poland" 38 "Wrocław")
+         (list "Germany" 83 "Berlin")
+         (list "France" 67 "Paris")
+         (list "Spain" 47 "Madrit"))))
+
+(define countries2
   (table
    (list (column-info 'country 'string)
          (column-info 'population 'number))
@@ -73,9 +83,7 @@
           [(and (null? tab)      (null? row))  #t]
           [(type-question (column-info-type (car tab)) (car row)) (for (cdr tab) (cdr row))]
           [else #f]))
-  (for tab row)
-   )
-
+  (for tab row))
 
 (define (table-insert row tab)
   (if (check-type row (table-schema tab))
@@ -85,40 +93,6 @@
       (error "Bledny typ danych\n"))
   )
 
-;(table-project '(city area) cities)
-; Projekcja
-(define (scheme cols tab)
-  (define (for cols tab xs)
-    (cond [(null? cols) xs]
-          [(null? tab) xs]
-          [(equal? (column-info-name (car tab)) (car cols)) (for (cdr cols) (cdr tab) (append xs (list (car tab))))]
-          [else (for cols (cdr tab) xs)]
-  ))
-  (for cols tab '()))
-
-(define (for1 all cols tab xs ys)
-  (cond [(null? tab) ys]
-        [else (for2 all all cols cols (car tab) tab xs ys)]))
-
-(define (for2 all1 all cols1 cols tab1 tab xs ys)
-  (cond [(null? all1)  (for1 all cols (cdr tab) '() (append ys (list xs)))]
-        [(null? cols1) (for1 all cols (cdr tab) '() (append ys (list xs)))]
-        [(null? tab1)  (for1 all cols (cdr tab) '() (append ys (list xs)))]
-        [(equal? (column-info-name (car all1)) (column-info-name (car cols1)))
-         (for2 (cdr all1) all (cdr cols1) cols (cdr tab1) tab (append xs (list (car tab1))) ys)]
-        [else (for2 (cdr all1) all cols1 cols (cdr tab1) tab xs ys)])
-  )
-
-(define (info all cols tab)
-  (for1 all cols tab '() '())
-  )
-
-;(table-project '( city country ) cities)
-(define (table-project cols tab)
-  (table
-   (scheme cols (table-schema tab))
-   (info (table-schema tab) (scheme cols (table-schema tab)) (table-rows tab)))
-  )
 ;(table-rename 'country 'kraj cities)
 ;Zmiana nazwy
 (define (change tab col ncol xs)
@@ -166,8 +140,26 @@
           [(eq2-f? form) 
             (if (go2 equal? col col row row (eq2-f-name form) (eq2-f-name2 form)) #t #f)]
           [(lt-f? form) 
-            (if (go < col row (lt-f-name form) (lt-f-val form)) #t #f)]
-          ))
+           (if (go (ask (lt-f-name form) col) col row (lt-f-name form) (lt-f-val form)) #t #f)]
+  ))
+
+#|
+(define (ask key cols)
+  (if (eq? key (column-info-name (car cols)))
+      (answer (column-info-type (car cols)))
+      (ask key (cdr cols))))
+      
+(define (answer key)
+   (cond [(eq? key 'string) string<? ]
+         [(eq? key 'number) <]
+         [(eq? key 'boolean) compare-bool]
+         [(eq? key 'symbol) compare-symbol]
+  ))      
+|#
+
+
+;lt-f nie śmiga problem ze wszystkim co nie jest number? bo nie może porównywać typów
+;zamiast ask było <
 
 (define (help-select form col row xs)
   (if (null? row)
@@ -175,7 +167,7 @@
       (if (type-select form col (car row) xs)
           (help-select form col (cdr row) (append xs (list (car row))))
           (help-select form col (cdr row) xs)
-         )))
+ )))
 
 (define (table-select form tab) 
   (table
@@ -195,28 +187,310 @@
       xs
       (gotab2 rows1 rows2 rows2 xs)))
       
-
 (define (table-cross-join tab1 tab2)
   (table
    (append (table-schema tab1) (table-schema tab2))
    (gotab1 (table-rows tab1) (table-rows tab2) '())
   ))
 
-; Sortowanie
-(define (build cols tab xs ys)
-  (if (null? ys) (help cols (cdr tab) (list xs))  (append ys (list xs)))
+
+;(table-project '( city country ) cities)
+; Projekcja
+(define (schemeloop tab taba cols xs)
+  (if (null? tab)
+      xs
+      (if (equal? (column-info-name (car tab)) (car cols))
+          (makescheme (cdr cols) taba (append xs (list (car tab))))
+          (schemeloop (cdr tab) taba cols xs))))
+
+(define (makescheme cols tab xs)
+    (if (null? cols)
+      xs
+      (schemeloop tab tab cols xs)))
+
+(define (rowloop cols colsa row rowa sch scha xs ys)
+  (if (null? cols)
+      (makerows colsa scha (cdr rowa) (append ys (list xs)))
+      (if (equal? (column-info-name (car sch)) (car cols))
+         (rowloop (cdr cols) colsa (car rowa) rowa scha scha (cons (car row) xs) ys)
+         (rowloop cols colsa (cdr row) rowa (cdr sch) scha xs ys))))
+
+(define (makerows cols sch rows xs)
+  (if (null? rows)
+      xs
+      (rowloop cols cols (car rows) rows sch sch  '() xs))
   )
 
-(define (help cols tab xs)
-  (if (null? tab) xs (build cols tab (car tab) xs))) 
+(define (table-project cols tab)
+  (table
+  (makescheme cols (table-schema tab) '())
+   (makerows (reverse cols) (table-schema tab) (table-rows tab) '())
+   ))
+
+; Sortowanie //niemalejace
+(define (compare-bool x y)
+   (implies x y))
+
+(define (compare-symbol x y)
+  (string<? (symbol->string x) (symbol->string y)))
+
+(define (ask key cols)
+  (if (eq? key (column-info-name (car cols)))
+      (answer (column-info-type (car cols)))
+      (ask key (cdr cols))))
+      
+(define (answer key)
+   (cond [(eq? key 'string) string<? ]
+         [(eq? key 'number) <]
+         [(eq? key 'boolean) compare-bool]
+         [(eq? key 'symbol) compare-symbol]
+  ))      
+
+(define (find-val elem key cols)
+  (if (eq? key (column-info-name (car cols)))
+      (car elem)
+      (find-val (cdr elem) key (cdr cols))))
+
+
+(define test
+  ( list
+( column-info 'city 'string )
+( column-info 'country 'string )
+( column-info 'area 'number )
+( column-info 'capital 'boolean ) ))
+
+(define (compare keys new old schema)
+  (if (null? keys)
+      #f
+      (if (eq? (find-val new (car keys) schema) (find-val old (car keys) schema))
+          (compare (cdr keys) new old schema)
+          ((ask (car keys) schema) (find-val new (car keys) schema) (find-val old (car keys) schema)))))
+(define (add keys new  rows schema)
+  (if (null? rows)
+      (list new)
+      (if (compare keys new (car rows) schema)
+          (cons new rows)
+          (cons (car rows) (add keys new (cdr rows) schema)))))
+
+(define (loop ys schema sort rows)
+  (if (null? rows)
+      ys
+      (loop (table (table-schema ys) (add sort (car rows) (table-rows ys) (table-schema ys))) schema sort (cdr rows)))) 
 
 (define (table-sort cols tab)
-  null
-  ;(table
-  ; (table-schema tab)
-   ;(help cols (table-rows tab) '()))
-  )
+  (loop (empty-table (table-schema tab)) (table-schema tab) cols (table-rows tab))) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#|
+(define (insert-in-place key n xs)
+  (if (null? xs)
+     (list n)
+     (if (key n (car xs))
+         (cons n xs)
+         (cons (car xs) (insert-in-place key n (cdr xs))))))
+
+(define (loop xs ys key)
+  (if (null? xs)
+      ys
+      (loop (cdr xs) (insert-in-place key (car xs) ys)))) 
+
+(define (insert-sort key xs)
+ (loop xs null key))
+
+
+
+(define (table-sort cols tab)
+  null)
+|#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ; Złączenie
-(define (table-natural-join tab1 tab2)
-  null;; uzupełnij
+;(help-join (table-schema tab1) (table-schema tab2) (table-schema tab1) '()  0)) -> 0 daje tablice powtorzonych
+#|
+
+
+
+(define (schemetolist xs ys)
+  (if (null? xs)
+    ys
+    (schemetolist (cdr xs) (append ys (list (column-info-name (car xs)))))))
+
+
+(define (loop tab xs)
+  (if (equal? (car (column-info-name (table-schema tab))) (car xs))
+      (zmiana (table-rename (column-info-name (car (table-schema tab))) (string-append (symbol->string (column-info-name (car (table-schema tab)))) "2") tab) (cdr xs))
+      (loop (cdr (table-schema tab)) xs)))
+      
+(define (zmiana tab xs)
+  (if (null? xs)
+      tab
+      (loop tab xs)
+      ))
+
+
+(define (fixed tab1 tab2 unique reps)
+  (table
+   unique
+   ;(table-rows (table-project (schemetolist unique '()) (table-cross-join tab1 tab2)))))
+   ;(cdr reps)))
+   (table-schema (table-cross-join tab1 (zmiana tab2 reps)))))
+   |#
+
+
+
+
+
+#|
+(define (help-join tab1 tab2 xs ys zm)
+  (if (null? tab2)
+      (if (= zm 1)
+      xs
+      ys)
+      (if (goh xs (column-info-name (car tab2)))
+          (help-join tab1 (cdr tab2) (append xs (list (car tab2))) ys zm)
+          (help-join tab1 (cdr tab2) xs (append ys (list (column-info-name (car tab2))))zm)))
   )
+
+(define (goh col x)
+  (cond [(null? col) #t]
+        [(equal? (column-info-name (car col)) x) #f]
+        [else (goh (cdr col) x)]
+  ))
+|#
+
+;(define (help-join 
+
+
+(define (table-natural-join tab1 tab2)
+  null)
+;  (help-join (table-schema tab1) (table-schema tab2) '() '() 1))
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
