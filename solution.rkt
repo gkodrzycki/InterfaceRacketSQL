@@ -33,15 +33,6 @@
          (list "Munich"  "Germany" 310 #f)
          (list "Paris"   "France"  105 #t)
          (list "Rennes"  "France"   50 #f))))
-(define cities2
-  (table                       
-   (list (column-info 'city    'string)
-         (column-info 'country 'string)
-         (column-info 'area    'number)
-         (column-info 'capital 'boolean)
-         (column-info 'capital 'boolean))
-   (list (list "Wrocław" "Poland"  293 #f #t)
-         (list "Warsaw"  "Warsaw"  517 #t #t))))
          
 (define countries
   (table
@@ -52,15 +43,6 @@
          (list "Germany" 83 "Berlin")
          (list "France" 67 "Paris")
          (list "Spain" 47 "Madrit"))))
-
-(define countries2
-  (table
-   (list (column-info 'country 'string)
-         (column-info 'population 'number))
-   (list (list "Poland" 38)
-         (list "Germany" 83)
-         (list "France" 67)
-         (list "Spain" 47))))
 
 (define (empty-table columns) (table columns '()))
 
@@ -140,26 +122,9 @@
           [(eq2-f? form) 
             (if (go2 equal? col col row row (eq2-f-name form) (eq2-f-name2 form)) #t #f)]
           [(lt-f? form) 
-           (if (go (ask (lt-f-name form) col) col row (lt-f-name form) (lt-f-val form)) #t #f)]
+             (if (go (ask (lt-f-name form) col 1) col row (lt-f-name form) (lt-f-val form)) #t #f)]
   ))
 
-#|
-(define (ask key cols)
-  (if (eq? key (column-info-name (car cols)))
-      (answer (column-info-type (car cols)))
-      (ask key (cdr cols))))
-      
-(define (answer key)
-   (cond [(eq? key 'string) string<? ]
-         [(eq? key 'number) <]
-         [(eq? key 'boolean) compare-bool]
-         [(eq? key 'symbol) compare-symbol]
-  ))      
-|#
-
-
-;lt-f nie śmiga problem ze wszystkim co nie jest number? bo nie może porównywać typów
-;zamiast ask było <
 
 (define (help-select form col row xs)
   (if (null? row)
@@ -231,19 +196,26 @@
 (define (compare-bool x y)
    (implies x y))
 
-(define (compare-symbol x y)
-  (string<? (symbol->string x) (symbol->string y)))
+(define (compare-bool2 x y)
+   (if (eq? x #t)
+       #f
+       (if (eq? y #t)
+           #t
+           #f)))
 
-(define (ask key cols)
+(define (ask key cols x)
   (if (eq? key (column-info-name (car cols)))
-      (answer (column-info-type (car cols)))
-      (ask key (cdr cols))))
+      (answer (column-info-type (car cols)) x)
+      (ask key (cdr cols) x)))
       
-(define (answer key)
+(define (answer key x)
    (cond [(eq? key 'string) string<? ]
          [(eq? key 'number) <]
-         [(eq? key 'boolean) compare-bool]
-         [(eq? key 'symbol) compare-symbol]
+         [(eq? key 'boolean)
+          (if (= x 0)
+              compare-bool
+              compare-bool2)]
+         [(eq? key 'symbol) symbol<?]
   ))      
 
 (define (find-val elem key cols)
@@ -251,20 +223,12 @@
       (car elem)
       (find-val (cdr elem) key (cdr cols))))
 
-
-(define test
-  ( list
-( column-info 'city 'string )
-( column-info 'country 'string )
-( column-info 'area 'number )
-( column-info 'capital 'boolean ) ))
-
 (define (compare keys new old schema)
   (if (null? keys)
       #f
       (if (eq? (find-val new (car keys) schema) (find-val old (car keys) schema))
           (compare (cdr keys) new old schema)
-          ((ask (car keys) schema) (find-val new (car keys) schema) (find-val old (car keys) schema)))))
+          ((ask (car keys) schema 0) (find-val new (car keys) schema) (find-val old (car keys) schema)))))
 (define (add keys new  rows schema)
   (if (null? rows)
       (list new)
@@ -280,184 +244,31 @@
 (define (table-sort cols tab)
   (loop (empty-table (table-schema tab)) (table-schema tab) cols (table-rows tab))) 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#|
-(define (insert-in-place key n xs)
-  (if (null? xs)
-     (list n)
-     (if (key n (car xs))
-         (cons n xs)
-         (cons (car xs) (insert-in-place key n (cdr xs))))))
-
-(define (loop xs ys key)
-  (if (null? xs)
-      ys
-      (loop (cdr xs) (insert-in-place key (car xs) ys)))) 
-
-(define (insert-sort key xs)
- (loop xs null key))
-
-
-
-(define (table-sort cols tab)
-  null)
-|#
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ; Złączenie
-;(help-join (table-schema tab1) (table-schema tab2) (table-schema tab1) '()  0)) -> 0 daje tablice powtorzonych
-#|
-
-
-
-(define (schemetolist xs ys)
-  (if (null? xs)
-    ys
-    (schemetolist (cdr xs) (append ys (list (column-info-name (car xs)))))))
-
-
-(define (loop tab xs)
-  (if (equal? (car (column-info-name (table-schema tab))) (car xs))
-      (zmiana (table-rename (column-info-name (car (table-schema tab))) (string-append (symbol->string (column-info-name (car (table-schema tab)))) "2") tab) (cdr xs))
-      (loop (cdr (table-schema tab)) xs)))
-      
-(define (zmiana tab xs)
-  (if (null? xs)
-      tab
-      (loop tab xs)
-      ))
-
-
-(define (fixed tab1 tab2 unique reps)
-  (table
-   unique
-   ;(table-rows (table-project (schemetolist unique '()) (table-cross-join tab1 tab2)))))
-   ;(cdr reps)))
-   (table-schema (table-cross-join tab1 (zmiana tab2 reps)))))
-   |#
-
-
-
-
-
-#|
-(define (help-join tab1 tab2 xs ys zm)
+(define (rowne tab1 tab2)
   (if (null? tab2)
-      (if (= zm 1)
+      '()
+      (if (eq? (column-info-name tab1) (column-info-name (car tab2)))
+          (list tab1)
+          (rowne tab1 (cdr tab2)))))
+
+(define (find-reps tab1 tab2 xs)
+  (if (null? tab1)
       xs
-      ys)
-      (if (goh xs (column-info-name (car tab2)))
-          (help-join tab1 (cdr tab2) (append xs (list (car tab2))) ys zm)
-          (help-join tab1 (cdr tab2) xs (append ys (list (column-info-name (car tab2))))zm)))
-  )
+      (find-reps (cdr tab1) tab2 (append xs (rowne (car tab1) tab2)))))
 
-(define (goh col x)
-  (cond [(null? col) #t]
-        [(equal? (column-info-name (car col)) x) #f]
-        [else (goh (cdr col) x)]
-  ))
-|#
+(define (make-schema tab xs)
+  (if (null? tab)
+      xs
+      
+  
 
-;(define (help-join 
+(define (table-natural-join tab1 tab2) 
+;(append (table-schema tab1) (table-schema tab2)))
+  (empty-table
+   (make-schema (append (table-schema tab1) (table-schema tab2) '()))))
 
-
-(define (table-natural-join tab1 tab2)
-  null)
-;  (help-join (table-schema tab1) (table-schema tab2) '() '() 1))
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  ;(find-reps (table-schema tab1) (table-schema tab2) '()))
 
 
 
