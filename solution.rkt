@@ -38,11 +38,12 @@
   (table
    (list (column-info 'country 'string)
          (column-info 'population 'number)
-         (column-info 'city    'string))
-   (list (list "Poland" 38 "Wrocław")
-         (list "Germany" 83 "Berlin")
-         (list "France" 67 "Paris")
-         (list "Spain" 47 "Madrit"))))
+         (column-info 'city    'string)
+         (column-info 'capital 'boolean))
+   (list (list "Poland" 38 "Wrocław" #f) 
+         (list "Germany" 83 "Berlin" #t)
+         (list "France" 67 "Paris" #t)
+         (list "Spain" 47 "Madrit" #t))))
 
 (define (empty-table columns) (table columns '()))
 
@@ -158,7 +159,6 @@
    (gotab1 (table-rows tab1) (table-rows tab2) '())
   ))
 
-
 ;(table-project '( city country ) cities)
 ; Projekcja
 (define (schemeloop tab taba cols xs)
@@ -257,18 +257,54 @@
       xs
       (find-reps (cdr tab1) tab2 (append xs (rowne (car tab1) tab2)))))
 
+(define (check xs tab)
+  (if (null? xs)
+      (list tab)
+      (if (eq? (column-info-name (car xs)) (column-info-name tab))
+          '()
+          (check (cdr xs) tab))))
+
 (define (make-schema tab xs)
   (if (null? tab)
       xs
-      
-  
+      (make-schema (cdr tab) (append xs (check xs (car tab))))))
+
+(define (find-value schema row rep)
+      (if (eq? (column-info-name (car schema)) (column-info-name rep))
+          (car row)
+          (find-value (cdr schema) (cdr row) rep)))
+
+(define (join schema row schemaa rowa reps)
+  (if (null? reps)
+      (list rowa)
+      (if (eq? (column-info-name (car schema)) (column-info-name (car reps)))
+          (if (eq? (car row) (find-value (cdr schema) (cdr row) (car reps)))
+              (join schemaa rowa schemaa rowa (cdr reps))
+              '())
+          (join (cdr schema) (cdr row) schemaa rowa reps))))
+          
+(define (make-rows alls allr reps xs)
+  (if (null? allr)
+      xs
+      (make-rows alls (cdr allr) reps (append xs (join alls (car allr) alls (car allr) reps)))))
+
+(define (not-in schema xs)
+  (if (null? xs)
+      (list schema)
+      (if (eq? schema (car xs))
+          '()
+          (not-in schema (cdr xs)))))
+   
+(define (cols-to-list schema xs)
+  (if (null? schema)
+      xs
+      (cols-to-list (cdr schema) (append xs (not-in (column-info-name (car schema)) xs)))))
 
 (define (table-natural-join tab1 tab2) 
-;(append (table-schema tab1) (table-schema tab2)))
-  (empty-table
-   (make-schema (append (table-schema tab1) (table-schema tab2) '()))))
-
-  ;(find-reps (table-schema tab1) (table-schema tab2) '()))
+   (table-project (cols-to-list (append (table-schema tab1) (table-schema tab2)) '())
+   (table
+    (append (table-schema tab1) (table-schema tab2))
+    (make-rows (table-schema (table-cross-join tab1 tab2)) (table-rows (table-cross-join tab1 tab2)) (find-reps (table-schema tab1) (table-schema tab2) '()) '() ))))
 
 
 
