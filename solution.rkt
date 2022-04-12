@@ -45,19 +45,23 @@
          (list "France" 67 "Paris" #t)
          (list "Spain" 47 "Madrit" #t))))
 
+(define countries1
+  (table
+   (list 
+         (column-info 'country 'string) 
+         (column-info 'population 'number)
+         (column-info 'city 'string)
+) '()))
+
 (define (empty-table columns) (table columns '()))
 
 ;(table-insert '("Gdynia" "Poland" 244 #f) cities)
 ; Wstawianie
 (define (type-question elem x)
-    (cond [(equal? 'string elem) 
-            (string? x)]
-          [(equal? 'number elem) 
-            (number? x)]
-          [(equal? 'boolean elem) 
-            (boolean? x)]
-          [(equal? 'symbol elem) 
-            (symbol? x)]))
+    (cond [(equal? 'string elem)  (string? x)]
+          [(equal? 'number elem)  (number? x)]
+          [(equal? 'boolean elem) (boolean? x)]
+          [(equal? 'symbol elem)  (symbol? x)]))
 
 (define (check-type row tab)
   (define (for tab row)
@@ -73,8 +77,7 @@
       (table
          (table-schema tab)
          (append (table-rows tab) (list row)))
-      (error "Bledny typ danych\n"))
-  )
+      (error "Bledny typ danych\n")))
 
 ;(table-rename 'country 'kraj cities)
 ;Zmiana nazwy
@@ -85,9 +88,8 @@
                           
 (define (table-rename col ncol tab)
   (table
-  (change (table-schema tab) col ncol '())
-  (table-rows tab))
-  )
+     (change (table-schema tab) col ncol '())
+     (table-rows tab)))
 
 ;(table-select ( or-f ( eq-f 'capital #t )( not-f ( lt-f 'area 300) ) )cities)
 ; Selekcja
@@ -99,32 +101,23 @@
 (define-struct lt-f (name val))
 
 
-(define (go f col row x y)
+(define (it f col row x y)
   (cond [(or (null? row) (null? col)) #f]
-        [(equal? (column-info-name (car col)) x) (if (f (car row) y) #t #f)]
-        [else (go f (cdr col) (cdr row) x y)]
-  ))
+        [(equal? (column-info-name (car col)) x) (f (car row) y)]
+        [else (it f (cdr col) (cdr row) x y)]))
 
-(define (go2 f col cols row rows x y)
+(define (it2 f col cols row rows x y)
   (cond [(or (null? row) (null? col)) #f]
-        [(equal? (column-info-name (car col)) x) (if (go equal? cols rows y (car row)) #t #f)]
-        [else (go2 f (cdr col) cols (cdr row) rows x y)]
-  ))
+        [(equal? (column-info-name (car col)) x) (it equal? cols rows y (car row))]
+        [else    (it2 f (cdr col) cols (cdr row) rows x y)]))
 
 (define (type-select form col row xs)
-    (cond [(and-f? form) 
-            (if (and (type-select (and-f-l form) col row xs) (type-select (and-f-r form) col row xs))#t #f)]
-          [(or-f? form) 
-            (if (or (type-select (or-f-l form) col row xs) (type-select (or-f-r form) col row xs))#t #f)]
-          [(not-f? form) 
-            (if (not (type-select (not-f-e form) col row xs)) #t #f)]
-          [(eq-f? form)
-           (if (go equal? col row (eq-f-name form) (eq-f-val form)) #t #f)]
-          [(eq2-f? form) 
-            (if (go2 equal? col col row row (eq2-f-name form) (eq2-f-name2 form)) #t #f)]
-          [(lt-f? form) 
-             (if (go (ask (lt-f-name form) col 1) col row (lt-f-name form) (lt-f-val form)) #t #f)]
-  ))
+    (cond [(and-f? form) (and (type-select (and-f-l form) col row xs) (type-select (and-f-r form) col row xs))]
+          [(or-f?  form) (or (type-select (or-f-l form) col row xs) (type-select (or-f-r form) col row xs))]
+          [(not-f? form) (not (type-select (not-f-e form) col row xs))]
+          [(eq-f?  form) (it equal? col row (eq-f-name form) (eq-f-val form))]
+          [(eq2-f? form) (it2 equal? col col row row (eq2-f-name form) (eq2-f-name2 form))]
+          [(lt-f?  form) (it (ask (lt-f-name form) col 1) col row (lt-f-name form) (lt-f-val form))]))
 
 
 (define (help-select form col row xs)
@@ -132,14 +125,12 @@
       xs
       (if (type-select form col (car row) xs)
           (help-select form col (cdr row) (append xs (list (car row))))
-          (help-select form col (cdr row) xs)
- )))
+          (help-select form col (cdr row) xs))))
 
 (define (table-select form tab) 
   (table
    (table-schema tab)
-  (help-select form (table-schema tab) (table-rows tab) '()))
-  )
+  (help-select form (table-schema tab) (table-rows tab) '())))
 
 ;( table-cross-join cities( table-rename 'country 'country2 countries ) )
 ; Złączenie kartezjańskie
@@ -155,9 +146,8 @@
       
 (define (table-cross-join tab1 tab2)
   (table
-   (append (table-schema tab1) (table-schema tab2))
-   (gotab1 (table-rows tab1) (table-rows tab2) '())
-  ))
+     (append (table-schema tab1) (table-schema tab2))
+     (gotab1 (table-rows tab1) (table-rows tab2) '())))
 
 ;(table-project '( city country ) cities)
 ; Projekcja
@@ -183,14 +173,12 @@
 (define (makerows cols sch rows xs)
   (if (null? rows)
       xs
-      (rowloop cols cols (car rows) rows sch sch  '() xs))
-  )
+      (rowloop cols cols (car rows) rows sch sch  '() xs)))
 
 (define (table-project cols tab)
   (table
-  (makescheme cols (table-schema tab) '())
-   (makerows (reverse cols) (table-schema tab) (table-rows tab) '())
-   ))
+     (makescheme cols (table-schema tab) '())
+     (makerows (reverse cols) (table-schema tab) (table-rows tab) '())))
 
 ; Sortowanie //niemalejace
 (define (compare-bool x y)
@@ -215,8 +203,7 @@
           (if (= x 0)
               compare-bool
               compare-bool2)]
-         [(eq? key 'symbol) symbol<?]
-  ))      
+         [(eq? key 'symbol) symbol<?]))      
 
 (define (find-val elem key cols)
   (if (eq? key (column-info-name (car cols)))
@@ -229,6 +216,7 @@
       (if (eq? (find-val new (car keys) schema) (find-val old (car keys) schema))
           (compare (cdr keys) new old schema)
           ((ask (car keys) schema 0) (find-val new (car keys) schema) (find-val old (car keys) schema)))))
+
 (define (add keys new  rows schema)
   (if (null? rows)
       (list new)
@@ -303,9 +291,8 @@
 (define (table-natural-join tab1 tab2) 
    (table-project (cols-to-list (append (table-schema tab1) (table-schema tab2)) '())
    (table
-    (append (table-schema tab1) (table-schema tab2))
-    (make-rows (table-schema (table-cross-join tab1 tab2)) (table-rows (table-cross-join tab1 tab2)) (find-reps (table-schema tab1) (table-schema tab2) '()) '() ))))
-
+       (append (table-schema tab1) (table-schema tab2))
+       (make-rows (table-schema (table-cross-join tab1 tab2)) (table-rows (table-cross-join tab1 tab2)) (find-reps (table-schema tab1) (table-schema tab2) '()) '() ))))
 
 
 
